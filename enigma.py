@@ -1,6 +1,6 @@
 import itertools, math, random, string
 # =======================
-#  Enigma M3 (I-V, reflector B/C), ataque moderno
+#  Enigma M3 (I-V, reflector B/C), modern attack
 #  Phases: seed (pos), refine rings, hill-climb plugboard
 # =======================
 
@@ -14,7 +14,7 @@ ROTORS = {
     "III": ("BDFHJLCPRTXVZNYEIWGAKMUSQO", "V"),
     "IV":  ("ESOVPZJAYQUIRHXLNFTGKDCMWB", "J"),
     "V":   ("VZBRGITYUPSDNHLXAWMJQOFECK", "Z"),
-    # Si quieres incluir VI-VIII, añádelos aquí
+    # If you want to include VI-VIII, add them here
 }
 REFLECTORS = {
     "B": "YRUHQSLDPXNGOKMIEBFZCWVJAT",
@@ -100,29 +100,29 @@ class Enigma:
         text=clean_text(text)
         return "".join(self.enc_letter(ch) for ch in text)
 
-# -------- Scoring (alemán sencillo: bigramas/trigramas + palabras frecuentes) --------
+# -------- Scoring (simple German: bigrams/trigrams + frequent words) --------
 GER_BIGRAMS = "ER EN CH DE EI TE IN NG ND SC ST RE GE BE UN HE AN AU SE DI IE NE IS".split()
 GER_TRIGRAMS = "DER DIE UND ICH NIC EIN SCH CHE DEN GEN UNS ZUR MIT END EIT BER".split()
-GER_WORDS = "DER DIE DAS UND IST NICHT EIN EINE MIT VON ZUR FÜR WETTER BERICHT NORDSEE BEFEHL UHR ANGRIFF SEKTOR MITTERNACHT UFER SICHERN UBOOT FEIND KONVOI".split()
+GER_WORDS = "DER DIE DAS UND IST NICHT EIN EINE MIT VON ZUR FUR WETTER BERICHT NORDSEE BEFEHL UHR ANGRIFF SEKTOR MITTERNACHT UFER SICHERN UBOOT FEIND KONVOI".split()
 
 def score_text(pt):
-    # Combina conteos de bigramas, trigramas y palabras; log-saturado
+    # Combine counts of bigrams, trigrams and words; log-saturated
     s = 0.0
-    # bigramas
+    # bigrams
     for bg in GER_BIGRAMS:
         s += pt.count(bg)
-    # trigramas
+    # trigrams
     for tg in GER_TRIGRAMS:
         s += 2.0 * pt.count(tg)
-    # palabras (bonus)
+    # words (bonus)
     for w in GER_WORDS:
         c = pt.count(w)
         if c: s += 4.0 * min(c, 3)
-    # penalización por caracteres repetidos sospechosos (antilenguaje)
-    # (muy suave: Enigma no produce 'J' en alemán militar con J->I, pero lo dejaremos neutro)
+    # penalty for suspicious repeated characters (anti-language)
+    # (very mild: Enigma did not produce 'J' in German military use with J->I, but we keep it neutral)
     return s
 
-# -------- Utilidades --------
+# -------- Utilities --------
 def all_positions(step=1):
     letters = ALPH[::step] if step>1 else ALPH
     for a in letters:
@@ -135,14 +135,14 @@ def all_rings():
         yield "".join(r)
 
 def best_k(items, k, key=lambda x:x):
-    # mantiene top-k simple
+    # keep top-k simple
     out=[]
     for it in items:
         out.append(it); out.sort(key=key, reverse=True)
         if len(out)>k: out.pop()
     return out
 
-# -------- Búsqueda FASE 1: seed sin plugboard, rings=AAA --------
+# -------- Phase 1 search: seed without plugboard, rings=AAA --------
 def seed_search(ciphertext, rotor_set=("I","II","III","IV","V"),
                 reflectors=("B","C"), pos_step=1,
                 sample_len=200, keep_top=50):
@@ -156,9 +156,9 @@ def seed_search(ciphertext, rotor_set=("I","II","III","IV","V"),
                 pt = e.enc(ct_sample)
                 sc = score_text(pt)
                 seeds = best_k(seeds + [(sc, ro, "AAA", pos, rf)], keep_top, key=lambda x:x[0])
-    return seeds  # lista de (score, rotors, rings, pos, refl)
+    return seeds  # list of (score, rotors, rings, pos, refl)
 
-# -------- Búsqueda FASE 2: refinar anillos para los mejores seeds --------
+# -------- Phase 2 search: refine rings for best seeds --------
 def refine_rings_for_seed(ct, seed, sample_len=240, keep_top=5):
     sc0, ro, _, pos, rf = seed
     ct_sample = clean_text(ct)[:sample_len]
@@ -170,7 +170,7 @@ def refine_rings_for_seed(ct, seed, sample_len=240, keep_top=5):
         best = best_k(best + [(sc, ro, rings, pos, rf)], keep_top, key=lambda x:x[0])
     return best
 
-# -------- FASE 3: Hill-climbing plugboard (hasta N pares) --------
+# -------- Phase 3: Hill-climbing plugboard (up to N pairs) --------
 def hillclimb_plugboard(ct, ro, rings, pos, rf, max_pairs=10,
                         iters=8000, start_temp=3.0, sample_len=None, seed_pairs=None, rnd=None):
     rnd = rnd or random.Random(0xC0FFEE)
@@ -179,7 +179,7 @@ def hillclimb_plugboard(ct, ro, rings, pos, rf, max_pairs=10,
         ct_sample = ct[:sample_len]
     else:
         ct_sample = ct
-    # estado actual
+    # current state
     pairs = list(seed_pairs or [])
     best_pairs = list(pairs)
 
@@ -194,7 +194,7 @@ def hillclimb_plugboard(ct, ro, rings, pos, rf, max_pairs=10,
     alphabet = list(ALPH)
     def random_move(cur_pairs):
         cur = set(tuple(sorted(p)) for p in cur_pairs)
-        # dos tipos de movimiento: añadir/quitar/cambiar un par
+        # three move types: add/remove/swap a pair
         move_type = rnd.choice(["add","swap","remove"])
         new = [tuple(p) for p in cur_pairs]
         if move_type=="add" and len(new) < max_pairs:
@@ -205,18 +205,18 @@ def hillclimb_plugboard(ct, ro, rings, pos, rf, max_pairs=10,
         elif move_type=="remove" and len(new)>0:
             idx = rnd.randrange(len(new))
             new.pop(idx)
-        else:  # swap: re-emparejar cuatro letras si hay al menos 2 pares
+        else:  # swap: re-pair four letters if at least 2 pairs exist
             if len(new)>=2:
                 i,j = rnd.sample(range(len(new)), 2)
                 a,b = new[i]
                 c,d = new[j]
-                # produce (a,c) y (b,d) con prob 0.5 o (a,d),(b,c)
+                # produce (a,c) and (b,d) with prob 0.5 or (a,d),(b,c)
                 if rnd.random()<0.5:
                     cand = [p for k,p in enumerate(new) if k not in (i,j)] + [tuple(sorted((a,c))), tuple(sorted((b,d)))]
                 else:
                     cand = [p for k,p in enumerate(new) if k not in (i,j)] + [tuple(sorted((a,d))), tuple(sorted((b,c)))]
                 new = cand
-        # normaliza pares ordenados y sin duplicados
+        # normalize pairs ordered and without duplicates
         norm = []
         used=set()
         for a,b in new:
@@ -237,10 +237,10 @@ def hillclimb_plugboard(ct, ro, rings, pos, rf, max_pairs=10,
             if cur_score > best_score:
                 best_score, best_pairs = cur_score, pairs[:]
                 best_score_pt = Enigma(rotor_names=ro, rings=rings, pos=pos, reflector=rf, plug_pairs=best_pairs).enc(ct)
-        # enfriamiento suave
+        # cooling schedule
         if (it+1) % 200 == 0:
             T *= 0.92
-    # salida final en texto completo
+    # final output on full text
     final_pt = Enigma(rotor_names=ro, rings=rings, pos=pos, reflector=rf, plug_pairs=best_pairs).enc(ct)
     return {
         "score": best_score,
@@ -252,7 +252,7 @@ def hillclimb_plugboard(ct, ro, rings, pos, rf, max_pairs=10,
         "plaintext": final_pt
     }
 
-# -------- Pipeline completo --------
+# -------- Full pipeline --------
 def break_enigma_like_allies(ciphertext,
                              rotor_set=("I","II","III","IV","V"),
                              reflectors=("B","C"),
@@ -264,32 +264,32 @@ def break_enigma_like_allies(ciphertext,
     rnd = random.Random(random_seed)
     ct = clean_text(ciphertext)
 
-    # (Opcional) filtro por CRIB para acelerar la Fase 1 (si se da)
+    # (Optional) filter by CRIB to speed up Phase 1 (if provided)
     def contains_crib(pt):
         return (crib is None) or (clean_text(crib) in pt)
 
-    # Fase 1: seeds sin plugboard, rings=AAA
+    # Phase 1: seeds without plugboard, rings=AAA
     seeds = seed_search(ct, rotor_set=rotor_set, reflectors=reflectors,
                         pos_step=pos_step, sample_len=seed_sample_len, keep_top=seed_keep)
     if crib:
         seeds = [s for s in seeds if contains_crib(Enigma(rotor_names=s[1], rings="AAA", pos=s[3], reflector=s[4]).enc(ct[:seed_sample_len]))] or seeds
 
-    # Fase 2: refinar anillos para los mejores seeds
+    # Phase 2: refine rings for best seeds
     ring_candidates=[]
     for s in seeds[:rings_keep]:
         ring_candidates += refine_rings_for_seed(ct, s, sample_len=rings_sample_len, keep_top=1)
     ring_candidates.sort(key=lambda x:x[0], reverse=True)
-    # Mejor candidato por ahora:
+    # Best candidate so far:
     _, ro, rings, pos, rf = ring_candidates[0]
 
-    # Fase 3: hill-climb plugboard
+    # Phase 3: hill-climb plugboard
     result = hillclimb_plugboard(ct, ro, rings, pos, rf,
                                  max_pairs=hill_pairs, iters=hill_iters,
                                  start_temp=3.5, sample_len=hill_sample_len, rnd=rnd)
 
     return result
 
-# =================== Ejemplo rápido ===================
+# =================== Quick Example ===================
 enigma_snd = Enigma(rotor_names=("I","II","III"), rings="AAA", pos="AAA",
                  reflector="B", plug_pairs=None)
 enigma_rcv = Enigma(rotor_names=("I","II","III"), rings="AAA", pos="AAA",
@@ -297,23 +297,23 @@ enigma_rcv = Enigma(rotor_names=("I","II","III"), rings="AAA", pos="AAA",
 
 if __name__ == "__main__":
     PLAINTEXT = "WETTERBERICHT VON DER NORDSEE UHR MITTERNACHT SICHERN UFER UBOOT KONVOI ANGRIFF"
-    CIPH = enigma_snd.enc(PLAINTEXT) #funciona mejor con frases largas. Sólo alemán simple.
-    print("PLAINTEXT: ", enigma_rcv.enc(CIPH))  # debería ser el plaintext
+    CIPH = enigma_snd.enc(PLAINTEXT) # works better with long phrases. Only simple German.
+    print("PLAINTEXT: ", enigma_rcv.enc(CIPH))  # should be the plaintext
     print("CIPHERTEXT:", CIPH)
     out = break_enigma_like_allies(
         CIPH,
         rotor_set=("I","II","III","IV","V"),
         reflectors=("B","C"),
-        pos_step=2,          # step >1 acelera (2 o 3) a costa de algo de precisión
+        pos_step=2,          # step >1 accelerates (2 or 3) at the cost of some accuracy
         seed_keep=50,
-        seed_sample_len=100, # usa 150-250 si tu PC aguanta
+        seed_sample_len=100, # use 150-250 if your PC can handle it
         rings_keep=6,
         rings_sample_len=120,
-        hill_iters=12000,    # sube a 50k-100k para calidad top
+        hill_iters=12000,    # increase to 50k-100k for top quality
         hill_pairs=10,
         hill_sample_len=None,
         random_seed=1337,
-        crib='WETTER'            # si sabes un crib (p.ej. "WETTER"), ponlo aquí
+        crib='WETTER'            # if you know a crib (e.g. "WETTER"), put it here
     )
     print("ROTORS:", out["rotors"], "RINGS:", out["rings"], "POS:", out["pos"], "REFLECTOR:", out["reflector"])
     print("PLUGBOARD:", " ".join(a+b for a,b in out["plugboard"]))
